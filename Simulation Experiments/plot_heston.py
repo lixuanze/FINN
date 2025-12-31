@@ -256,24 +256,20 @@ def main(argv):
 
         eps = 1e-12
 
-        # ---------- Price metrics ----------
         err_c = bs_call - pred_call
         abs_err_c = np.abs(err_c)
         sq_err_c  = err_c**2
         
-        price_floor = 1e-1  # keep your choice (or 0.01 if that's what you used later)
+        price_floor = 1e-1  
         mask_c = np.abs(bs_call) > price_floor
         
-        # RMAD = sum|e| / sum|y|  (WAPE-style, stable; no per-point division)
         den_c = np.sum(np.abs(bs_call[mask_c])) + eps
         option_rmad = np.sum(abs_err_c[mask_c]) / den_c
         
-        # MSE (keep as-is) and RMSE = sqrt(MSE)
         option_mse = np.mean(sq_err_c)
         den2_c = np.sum(bs_call[mask_c]**2) + eps
         option_rmse = np.sqrt(np.sum(sq_err_c[mask_c]) / den2_c)
 
-        # NMAD = MAE normalized by (max-min) of true values over the same mask
         range_c = (np.max(bs_call[mask_c]) - np.min(bs_call[mask_c])) + eps
         option_nmad = np.mean(abs_err_c[mask_c]) / range_c
         
@@ -283,12 +279,11 @@ def main(argv):
         option_mse_result.append(round(option_mse, 4))
         
         
-        # ---------- Delta metrics ----------
         err_d = bs_delta - pred_delta
         abs_err_d = np.abs(err_d)
         sq_err_d  = err_d**2
         
-        delta_floor = 1e-2  # keep your choice (or 1e-3 if you used that later)
+        delta_floor = 1e-2 
         mask_d = np.abs(bs_delta) > delta_floor
         
         den_d = np.sum(np.abs(bs_delta[mask_d])) + eps
