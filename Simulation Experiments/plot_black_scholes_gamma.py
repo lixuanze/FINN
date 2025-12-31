@@ -274,7 +274,6 @@ def main(argv):
         ax.legend(loc='best', prop={'size': 24, 'weight': 'bold'})
         plt.savefig('gbm_results_gamma/TTM: ' + str(t[j]) + '{}_{}_{}_{}_Gamma_Error.png'.format(FLAGS.option_type, FLAGS.volatility, FLAGS.set_seed, FLAGS.hedge_option_ttm))
         
-        # ---- option price metrics ----
         option_abs_err = np.abs(bs_call - pred_call)
         option_sq_err  = (bs_call - pred_call) ** 2
         
@@ -292,8 +291,6 @@ def main(argv):
         option_nmad_result.append(round(option_nmad, 4))
         option_mse_result.append(round(option_mse, 4))
         
-        
-        # ---- delta metrics ----
         delta_abs_err = np.abs(bs_delta - pred_delta)
         delta_sq_err  = (bs_delta - pred_delta) ** 2
         
@@ -311,25 +308,19 @@ def main(argv):
         delta_nmad_result.append(round(delta_nmad, 4))
         delta_mse_result.append(round(delta_mse, 4))
         
-        
-        # ---- gamma metrics ----
         gamma_abs_err = np.abs(bs_gamma - pred_gamma)
         gamma_sq_err  = (bs_gamma - pred_gamma) ** 2
         
         gamma_floor = 1e-4
         mask_g = np.abs(bs_gamma) > gamma_floor
         
-        # FIX 1: weighted relative L1 (stable)
         gamma_rmad = np.sum(gamma_abs_err[mask_g]) / (np.sum(np.abs(bs_gamma[mask_g])) + 1e-12)
         
-        # FIX 2: weighted relative L2 (stable)
         gamma_rmse = np.sqrt(np.sum(gamma_sq_err[mask_g]) / (np.sum(bs_gamma[mask_g]**2) + 1e-12))
         
-        # FIX 3 (recommended): make NMAD use the same mask (otherwise near-zero gamma dominates)
         range_g = (np.max(bs_gamma[mask_g]) - np.min(bs_gamma[mask_g])) + 1e-12
         gamma_nmad = np.mean(gamma_abs_err[mask_g]) / range_g
 
-        # keep MSE as-is (or mask it if you want consistency)
         gamma_mse  = np.mean(gamma_sq_err)
 
     
