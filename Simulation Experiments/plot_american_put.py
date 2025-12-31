@@ -1,7 +1,3 @@
-#!/usr/bin/env python3
-# american_put_compare_and_boundary.py
-# Requires: tensorflow, QuantLib (Python), numpy, pandas, matplotlib, absl
-
 import os
 import numpy as np
 import pandas as pd
@@ -12,7 +8,6 @@ import QuantLib as ql
 
 tf.keras.backend.set_floatx("float64")
 
-# ---------------- Flags ----------------
 flags.DEFINE_string('option_type', 'put', 'Only "put" is supported here (American).')
 flags.DEFINE_integer('set_seed', 413, 'seed tag used in model filename & logging')
 flags.DEFINE_float('volatility', 0.15, 'vol (sigma) used by FD baseline')
@@ -28,20 +23,17 @@ flags.DEFINE_string('model_path', '',
                     '"gbm_american_put_trained_models/gbm_american_put_{vol}_{seed}.keras"')
 flags.DEFINE_string('out_dir', 'american_results', 'output directory for images and CSV')
 
-# Numerical-bump controls (used for BOTH ANN Δ and FD Δ)
 flags.DEFINE_float('bump_rel', 1e-4, 'relative bump size for S when computing FD delta')
 flags.DEFINE_float('bump_abs', 0.0,  'absolute bump size (overrides rel if >0)')
 
 FLAGS = flags.FLAGS
 
-# ------------- Grids & view -------------
 VIEW_ELEV = 37.5
 VIEW_AZIM = 225
 
 TTM_LIST = [i/250.0 for i in range(60, 121, 10)]      # 60..120 trading days
 K_LIST   = [float(i) for i in range(90, 111, 1)]      # strikes 90..110
 
-# ------------- Helper: axes -------------
 def _make_axes():
     fig = plt.figure(figsize=(15, 15), facecolor='white')
     plt.rcParams['axes.facecolor'] = 'white'
@@ -84,7 +76,6 @@ def _save_error_surface(X, Y, ERR, zlabel, path, xlabel='S', ylabel='K'):
     plt.savefig(path, bbox_inches='tight')
     plt.close(fig)
 
-# ------------- ANN helpers -------------
 def _to_col(x):
     arr = np.asarray(x, dtype=np.float64)
     return arr.reshape(-1, 1)
@@ -116,7 +107,6 @@ def ann_delta_grid_bump(model, S_grid, K, T, r, option_type="put",
     V_dn = ann_price_grid(model, S_dn, K, T, r, option_type)
     return (V_up - V_dn) / (S_up - S_dn)
 
-# ---------- QuantLib: engine ----------
 DAY_COUNT = ql.Actual365Fixed()
 CALENDAR  = ql.TARGET()
 
@@ -181,7 +171,6 @@ def ql_fd_price_surface_and_delta_by_bump(
 
     return price, delta
 
-# ---------- Exercise boundary extraction ----------
 def find_exercise_boundary_S(S_grid, price_vec, K, option_type='put', tol_rel=1e-4):
     """
     For fixed (K,T), return the boundary S* where V(S,T,K) ≈ payoff(S,K).
@@ -196,7 +185,6 @@ def find_exercise_boundary_S(S_grid, price_vec, K, option_type='put', tol_rel=1e
         return np.nan
     return S_grid[idx[-1]]
 
-# ---------------- Main ----------------
 def main(_argv):
     assert FLAGS.option_type == "put", 'This script is for American puts (option_type="put").'
 
@@ -215,24 +203,18 @@ def main(_argv):
     S_grid = np.linspace(FLAGS.s_min, FLAGS.s_max, num=n_s, dtype=np.float64)
     K_list = [float(k) for k in K_LIST]
 
-    # Metrics holders
-    # Metrics holders (relative + normalized + raw MSE)
     option_rmad_result, option_rmse_result, option_nmad_result, option_mse_result = [], [], [], []
     delta_rmad_result,  delta_rmse_result,  delta_nmad_result,  delta_mse_result  = [], [], [], []
 
-
-    # Exercise boundary storage: shape (n_T, n_K)
     Z_ann = np.full((len(TTM_LIST), len(K_list)), np.nan, dtype=np.float64)
     Z_fd  = np.full((len(TTM_LIST), len(K_list)), np.nan, dtype=np.float64)
 
-    # Per-TTM evaluation (save price/Δ surfaces + errors)
     for ti, T in enumerate(TTM_LIST):
         print(f"Time to Maturity: {T:.4f} years")
 
         pred_price = np.empty((n_s, len(K_list)), dtype=np.float64)
         pred_delta = np.empty((n_s, len(K_list)), dtype=np.float64)
 
-        # FD baseline (price + Δ via bump on price)
         ql_price, ql_delta = ql_fd_price_surface_and_delta_by_bump(
             S_grid, K_list, T_years=T,
             r=FLAGS.rate, q=FLAGS.dividend, sigma=FLAGS.volatility,
@@ -241,7 +223,6 @@ def main(_argv):
             bump_abs=FLAGS.bump_abs if FLAGS.bump_abs > 0.0 else 0.0
         )
 
-        # FINN (price + Δ via bump on ANN price)
         for j, K in enumerate(K_list):
             pred_price[:, j] = ann_price_grid(model, S_grid, K, T, FLAGS.rate, option_type="put")
             pred_delta[:, j] = ann_delta_grid_bump(
@@ -249,11 +230,9 @@ def main(_argv):
                 bump_rel=FLAGS.bump_rel, bump_abs=FLAGS.bump_abs
             )
 
-            # ---- exercise boundary for this (K,T)
             Z_ann[ti, j] = find_exercise_boundary_S(S_grid, pred_price[:, j], K, 'put')
             Z_fd[ti, j]  = find_exercise_boundary_S(S_grid, ql_price[:, j],  K, 'put')
 
-        # Mesh for plots at fixed T: X=S, Y=K
         stock_price  = np.tile(S_grid.reshape(-1, 1), (1, len(K_list)))
         strike_price = np.tile(np.array(K_list, dtype=np.float64).reshape(1, -1), (n_s, 1))
 
@@ -271,7 +250,6 @@ def main(_argv):
                         zlabel=r'$\Delta$', legend1='FINN', legend2='Finite Difference',
                         path=delta_path, xlabel='S', ylabel='K')
 
-        # Errors
         price_err = ql_price - pred_price
         delta_err = ql_delta - pred_delta
 
@@ -287,31 +265,25 @@ def main(_argv):
         _save_error_surface(stock_price, strike_price, delta_err, zlabel=r'Error of $\Delta$',
                             path=delta_err_path, xlabel='S', ylabel='K')
 
-        # Scalar metrics per T (reference = QuantLib FD)
         eps = 1e-12
-        PRICE_FLOOR = 1e-1   # same role as your GBM script
+        PRICE_FLOOR = 1e-1  
         DELTA_FLOOR = 1e-2
         
-        # --- Price metrics ---
         err_p = ql_price - pred_price
         abs_err_p = np.abs(err_p)
         sq_err_p  = err_p**2
         
         mask_p = np.abs(ql_price) > PRICE_FLOOR
         
-        # RMAD = sum|e| / sum|y|  (GBM script)
         den_p = np.sum(np.abs(ql_price[mask_p])) + eps
         option_rmad = np.sum(abs_err_p[mask_p]) / den_p if np.any(mask_p) else np.nan
         
-        # RMSE = sqrt( sum e^2 / sum y^2 )  (GBM script)
         den2_p = np.sum((ql_price[mask_p])**2) + eps
         option_rmse = np.sqrt(np.sum(sq_err_p[mask_p]) / den2_p) if np.any(mask_p) else np.nan
         
-        # NMAD = MAE / (max-min of y)  (GBM script)
         range_p = (np.max(ql_price[mask_p]) - np.min(ql_price[mask_p])) + eps if np.any(mask_p) else np.nan
         option_nmad = (np.mean(abs_err_p[mask_p]) / range_p) if np.any(mask_p) else np.nan
         
-        # MSE = mean(e^2) over ALL points (GBM script keeps unmasked MSE)
         option_mse = np.mean(sq_err_p)
         
         option_rmad_result.append(round(float(option_rmad), 4) if np.isfinite(option_rmad) else np.nan)
@@ -319,7 +291,6 @@ def main(_argv):
         option_nmad_result.append(round(float(option_nmad), 4) if np.isfinite(option_nmad) else np.nan)
         option_mse_result.append(round(float(option_mse), 4))
         
-        # --- Delta metrics ---
         err_d = ql_delta - pred_delta
         abs_err_d = np.abs(err_d)
         sq_err_d  = err_d**2
@@ -342,7 +313,6 @@ def main(_argv):
         delta_nmad_result.append(round(float(delta_nmad), 4) if np.isfinite(delta_nmad) else np.nan)
         delta_mse_result.append(round(float(delta_mse), 4))
 
-    # Save metrics CSV
     data = {
     "ttm": [round(t, 4) for t in TTM_LIST],
     "option_rmad_result": option_rmad_result,
