@@ -94,19 +94,14 @@ def main(argv):
         elif FLAGS.option_type in ("put",):
             delta = tf.clip_by_value(delta, -1.0, 0.0)
 
-        # Soft continuation gate (σ), smoother than a hard indicator
-        ## approximation to I_{g>f}
         tau_rel = tf.cast(0.01, tf.float64)
         tau = tau_rel * K
         gate = tf.sigmoid((out - payoff) / (tau))
         gate *= tf.cast(T > 1e-3, tf.float64)
 
-        # Hedging residual over one step, weighted by the gate so that we only penalize when the gate is 1
-        ### for outside of the gate we use penalty
         pnl_residual = delta * (S_ - S) - (out_ - out)
         hedge_loss = tf.reduce_mean(gate * tf.square(pnl_residual))
 
-        # Exercise constraint penalty
         penalty = tf.reduce_mean(tf.square(tf.nn.relu(payoff - out)))
 
         return hedge_loss + tf.cast(FLAGS.lambda_penalty, tf.float64) * penalty
