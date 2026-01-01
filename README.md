@@ -1,4 +1,4 @@
 # Finance-Infomred Neural Network
 
 ## About
-This repository contains the companion code for the paper The AI Black-Scholes: Finance-Informed Neural Network (https://arxiv.org/abs/2412.12213)
+This repository contains the companion code for the paper *Finance-Informed Neural Network: Learning the Geometry of Option Pricing* (https://arxiv.org/abs/2412.12213)
